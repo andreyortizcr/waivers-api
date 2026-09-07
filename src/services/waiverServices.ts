@@ -7,7 +7,6 @@ const table = process.env.DB_TABLE!
 const bucket = process.env.SUPABASE_BUCKET!
 
 
-/** Calculate risk level by conditions */
 function calcRisk(body: any) {
 
     const conditions = [body.alcoholism, body.claustrophobia, body.dizzines, body.ear_infection,
@@ -34,13 +33,11 @@ function calcRisk(body: any) {
 
 async function pngToWebP(dataUrl: string): Promise<Buffer> {
 
-    // data:image/png;base64,AAAA...
     const base64 = dataUrl.replace("data:image/png;base64,", "")
     const pngBuffer = Buffer.from(base64, "base64")
 
-    // Convertimos a WEBP con sharp
     const webpBuffer = await sharp(pngBuffer)
-        .webp({ quality: 60 })  // ajusta calidad si quieres
+        .webp({ quality: 60 })
         .toBuffer()
 
     return webpBuffer
@@ -49,23 +46,35 @@ async function pngToWebP(dataUrl: string): Promise<Buffer> {
 
 async function uploadsign(dataUrl: string): Promise<string> {
 
-    // Convierte PNG (del front) a WEBP
+    if (!dataUrl.startsWith('data:image/png;base64,')) {
+        throw new Error('Firma inválida')
+    }
+
     const buffer = await pngToWebP(dataUrl)
 
     const name = `${bucket}/${new Date().toISOString().slice(0, 10)}_${crypto.randomUUID()}.webp`
 
-    await supabase.storage
-        .from(bucket!)
+    const { error } = await supabase.storage
+        .from(bucket)
         .upload(name, buffer, {
             contentType: "image/webp",
             upsert: false
         })
 
-    const { data } = supabase.storage.from(bucket!).getPublicUrl(name)
-    return data.publicUrl
+    if (error) throw new Error(`Error subiendo firma: ${error.message}`)
+
+    return name
 }
 
 
+export async function getSignatureUrl(filePath: string, expiresIn = 3600): Promise<string> {
+    const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(filePath, expiresIn)
+
+    if (error || !data?.signedUrl) throw new Error('No se pudo generar URL de firma')
+    return data.signedUrl
+}
 
 
 
