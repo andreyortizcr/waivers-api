@@ -37,7 +37,7 @@ router.get("/:id", valAuth, async (req, res) => {
         const signedUrl = await getSignatureUrl(waiver.signature_url, 300)
         const waiverSigned = { ...waiver, signature_url: signedUrl }
 
-        return res.json(waiver)
+        return res.json(waiverSigned)
     } catch (err: any) {
         return res.status(500).json({ error: 'Error en obtener waiver' })
     }
